@@ -1,6 +1,6 @@
 # emoji-tools
 
-Turn any logo or image into Slack emojis. One binary, seven makers:
+Turn any logo or image into Slack emojis. One binary, ten makers:
 
 | Command | What it makes |
 |---|---|
@@ -11,6 +11,9 @@ Turn any logo or image into Slack emojis. One binary, seven makers:
 | `uwu` | Overlays a uwu face onto your image. |
 | `petpet` | A hand patting your image (the petpet meme). |
 | `panic` | A frantic zoom-pulse + shake animation. |
+| `party` | Cycles the image through party-parrot rainbow colours. |
+| `party-blob` | The rainbow colour-cycle plus a bouncing squash-and-stretch wobble. |
+| `spin` | A spinning-coin 3D flip around the vertical axis. |
 
 Every output is a **square** image within Slack's limits.
 
@@ -95,11 +98,32 @@ emoji-tools panic hyperdx.svg                        # -> hyperdx_panic.gif
 emoji-tools panic logo.png -min 0.3 -jitter 0.2      # smaller start, more shake
 ```
 
+### party / party-blob
+
+```sh
+emoji-tools party clickhouse-logo.svg               # -> clickhouse-logo_party.gif
+emoji-tools party-blob kat.png                       # rainbow cycle + wobble
+emoji-tools party-blob kat.png -amp 0.2 -dur 50      # bigger, faster bounce
+```
+
+`party` cycles the hue through the rainbow in place; `party-blob` adds a bouncing
+squash-and-stretch on top.
+
+### spin
+
+```sh
+emoji-tools spin coin.png                            # -> coin_spin.gif
+emoji-tools spin logo.svg -frames 16 -dur 45         # smoother, faster spin
+```
+
+A 3D coin-flip around the vertical axis: the image thins to an edge and shows its
+mirror on the way round.
+
 ## Slack emoji limits
 
 Slack custom emoji must be **square**, **under 128 KB**, and animated GIFs are capped at
 **50 frames**. Every command emits a square image; animated commands default to 112–128px
-with ≤10 frames, and the `-tile`/`-size` flags are capped at 256px.
+with ≤14 frames, and the `-tile`/`-size` flags are capped at 256px.
 
 ## Credits
 

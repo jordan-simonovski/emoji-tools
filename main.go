@@ -23,6 +23,9 @@ Commands:
   uwu        Overlay a uwu face onto your image
   petpet     A hand patting your image (petpet meme)
   panic      Frantic zoom-pulse + shake animation
+  party      Cycle the image through party-parrot rainbow colours
+  party-blob Rainbow colour-cycle plus a bouncing wobble
+  spin       3D coin-flip spin around the vertical axis
 
 Run "emoji-tools <command> -h" for command-specific flags.
 `
@@ -48,6 +51,12 @@ func main() {
 		err = runPetpet(os.Args[2:])
 	case "panic":
 		err = runPanic(os.Args[2:])
+	case "party":
+		err = runParty(os.Args[2:])
+	case "party-blob":
+		err = runPartyBlob(os.Args[2:])
+	case "spin":
+		err = runSpin(os.Args[2:])
 	case "-h", "--help", "help":
 		fmt.Print(usage)
 	default:

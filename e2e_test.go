@@ -197,3 +197,80 @@ func TestE2E_Panic(t *testing.T) {
 		t.Error("panic accepted tile > 256; want error")
 	}
 }
+
+func TestE2E_Party(t *testing.T) {
+	defer quiet(t)()
+	dir := t.TempDir()
+	pngIn, _ := writeFixtures(t, dir)
+	if err := runParty([]string{pngIn, "-name", "pty", "-tile", "64", "-frames", "8", "-out", dir}); err != nil {
+		t.Fatalf("party: %v", err)
+	}
+	if n := gifFrameCount(t, filepath.Join(dir, "pty.gif")); n != 8 {
+		t.Errorf("party frames = %d, want 8", n)
+	}
+}
+
+func TestE2E_PartyBlob(t *testing.T) {
+	defer quiet(t)()
+	dir := t.TempDir()
+	pngIn, _ := writeFixtures(t, dir)
+	if err := runPartyBlob([]string{pngIn, "-name", "pb", "-tile", "64", "-frames", "8", "-out", dir}); err != nil {
+		t.Fatalf("party-blob: %v", err)
+	}
+	if n := gifFrameCount(t, filepath.Join(dir, "pb.gif")); n != 8 {
+		t.Errorf("party-blob frames = %d, want 8", n)
+	}
+	if err := runPartyBlob([]string{pngIn, "-tile", "64", "-amp", "0.6", "-out", dir}); err == nil {
+		t.Error("party-blob accepted amp >= 0.5; want error")
+	}
+	// amp valid on its own but too large for the tile -> content < 1px
+	if err := runPartyBlob([]string{pngIn, "-tile", "1", "-out", dir}); err == nil {
+		t.Error("party-blob accepted tile too small for amp; want error")
+	}
+}
+
+func TestE2E_Spin(t *testing.T) {
+	defer quiet(t)()
+	dir := t.TempDir()
+	pngIn, _ := writeFixtures(t, dir)
+	// frames divisible by 4 puts an exact edge-on (cos=0) frame in the loop.
+	if err := runSpin([]string{pngIn, "-name", "sp", "-tile", "64", "-frames", "8", "-out", dir}); err != nil {
+		t.Fatalf("spin: %v", err)
+	}
+	if n := gifFrameCount(t, filepath.Join(dir, "sp.gif")); n != 8 {
+		t.Errorf("spin frames = %d, want 8", n)
+	}
+	if op := minOpaquePixels(t, filepath.Join(dir, "sp.gif")); op != 0 {
+		t.Errorf("spin: no fully edge-on (blank) frame; min opaque pixels = %d, want 0", op)
+	}
+}
+
+// minOpaquePixels returns the smallest number of non-transparent pixels across
+// all frames of a GIF.
+func minOpaquePixels(t *testing.T, path string) int {
+	t.Helper()
+	f, err := os.Open(path)
+	if err != nil {
+		t.Fatalf("open %s: %v", path, err)
+	}
+	defer f.Close()
+	g, err := gif.DecodeAll(f)
+	if err != nil {
+		t.Fatalf("decode gif %s: %v", path, err)
+	}
+	min := -1
+	for _, fr := range g.Image {
+		b, count := fr.Bounds(), 0
+		for y := b.Min.Y; y < b.Max.Y; y++ {
+			for x := b.Min.X; x < b.Max.X; x++ {
+				if _, _, _, a := fr.At(x, y).RGBA(); a > 0 {
+					count++
+				}
+			}
+		}
+		if min < 0 || count < min {
+			min = count
+		}
+	}
+	return min
+}

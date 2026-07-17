@@ -50,6 +50,15 @@ func orName(flagVal, path string) string {
 	return sanitizeName(path)
 }
 
+// orNameSuffix is orName with a per-command suffix on the derived name, so each
+// maker writes a distinct default file (e.g. "_party" vs "_party_blob").
+func orNameSuffix(flagVal, path, suffix string) string {
+	if flagVal != "" {
+		return flagVal
+	}
+	return sanitizeName(path) + suffix
+}
+
 var nonName = regexp.MustCompile(`[^a-z0-9_-]+`)
 
 // sanitizeName turns a file path into a Slack-safe emoji name.
