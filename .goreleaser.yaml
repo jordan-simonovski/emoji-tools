@@ -38,3 +38,11 @@ homebrew_casks:
     homepage: "https://github.com/jordan-simonovski/emoji-tools"
     description: "Turn logos into Slack emojis: grids, scrolls, intensify, yells-at, uwu"
     license: "Apache-2.0"
+    # The binary is unsigned; strip the quarantine flag on install so macOS
+    # Gatekeeper doesn't block it ("Apple could not verify ...").
+    hooks:
+      post:
+        install: |
+          if system_command("/usr/bin/xattr", args: ["-h"]).exit_status == 0
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/emoji-tools"]
+          end
