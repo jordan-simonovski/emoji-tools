@@ -1,6 +1,6 @@
 # emoji-tools
 
-Turn any logo or image into Slack emojis. One binary, ten makers:
+Turn any logo or image into Slack emojis. One binary, twelve makers:
 
 | Command | What it makes |
 |---|---|
@@ -14,6 +14,8 @@ Turn any logo or image into Slack emojis. One binary, ten makers:
 | `party` | Cycles the image through party-parrot rainbow colours. |
 | `party-blob` | The rainbow colour-cycle plus a bouncing squash-and-stretch wobble. |
 | `spin` | A spinning-coin 3D flip around the vertical axis. |
+| `confetti` | Rains confetti over your image (animated overlay). |
+| `bongocat` | Bongo cat drumming on your image, overlaid so the cat sits in front. |
 
 Every output is a **square** image within Slack's limits.
 
@@ -119,6 +121,26 @@ emoji-tools spin logo.svg -frames 16 -dur 45         # smoother, faster spin
 A 3D coin-flip around the vertical axis: the image thins to an edge and shows its
 mirror on the way round.
 
+### confetti
+
+```sh
+emoji-tools confetti clickhouse-logo.svg            # -> clickhouse-logo_confetti.gif
+emoji-tools confetti logo.png -frames 30            # fewer frames (smaller file)
+```
+
+Composites a falling-confetti animation over your image. The overlay is subsampled
+to `-frames` (default 50) to stay within Slack's 50-frame cap.
+
+### bongocat
+
+```sh
+emoji-tools bongocat clickhouse-logo.svg            # -> bongo_clickhouse-logo.gif
+emoji-tools bongocat logo.png -scale 0.5 -dur 90    # smaller drum, faster drumming
+```
+
+Bongo cat drumming on your image: your image is the drum, and the cat is overlaid
+on top so its body cuts off the top of the image — it reads as the cat in front.
+
 ## Slack emoji limits
 
 Slack custom emoji must be **square**, **under 128 KB**, and animated GIFs are capped at
@@ -133,3 +155,5 @@ with ≤14 frames, and the `-tile`/`-size` flags are capped at 256px.
   [doctaphred](https://gist.github.com/doctaphred/f30716e341aaa0673294639093a0632a).
 - `petpet` uses the hand-frame artwork from
   [aDu/pet-pet-gif](https://github.com/aDu/pet-pet-gif).
+- `bongocat` uses the "bongo cat" meme (original cat art by StrayRogue,
+  animation by DitzyFlama).

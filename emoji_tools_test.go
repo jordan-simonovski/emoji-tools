@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"image"
 	"image/color"
+	"image/gif"
 	"testing"
 )
 
@@ -89,6 +91,96 @@ func TestHueRotateIdentity(t *testing.T) {
 				t.Fatalf("hueRotate(_, 0) changed opaque pixel (%d,%d): got %+v, want %+v", x, y, out, in)
 			}
 		}
+	}
+}
+
+// subsampleFrames must cap the frame count and preserve the total loop time by
+// folding dropped frames' delays into the frames it keeps.
+func TestSubsampleFrames(t *testing.T) {
+	const n = 55
+	frames := make([]*image.RGBA, n)
+	delays := make([]int, n)
+	total := 0
+	for i := range frames {
+		frames[i] = image.NewRGBA(image.Rect(0, 0, 1, 1))
+		delays[i] = i + 1 // varied so folding is actually exercised
+		total += delays[i]
+	}
+	gotF, gotD := subsampleFrames(frames, delays, 50)
+	if len(gotF) != 50 || len(gotD) != 50 {
+		t.Fatalf("subsampleFrames kept %d frames / %d delays, want 50 each", len(gotF), len(gotD))
+	}
+	sum := 0
+	for _, d := range gotD {
+		sum += d
+	}
+	if sum != total {
+		t.Errorf("total delay = %d after subsample, want %d (loop duration must be preserved)", sum, total)
+	}
+	// A cap at or above the input length is a no-op.
+	if f, _ := subsampleFrames(frames, delays, 100); len(f) != n {
+		t.Errorf("subsampleFrames capped below input when max > len: got %d, want %d", len(f), n)
+	}
+	// max < 1 is a no-op guard (callers validate, but the branch must hold).
+	if f, _ := subsampleFrames(frames, delays, 0); len(f) != n {
+		t.Errorf("subsampleFrames(max=0) returned %d frames, want %d (no-op)", len(f), n)
+	}
+}
+
+// gifFrames must honor GIF disposal: DisposalBackground clears the frame's own
+// region to transparent for the next frame, and DisposalPrevious restores the
+// canvas as it was before that frame drew. Build a 4-frame GIF exercising both
+// and assert the composited pixels.
+func TestGifFrames(t *testing.T) {
+	red := color.RGBA{255, 0, 0, 255}
+	green := color.RGBA{0, 255, 0, 255}
+	pal := color.Palette{red, green, color.RGBA{}}
+	fill := func(r image.Rectangle, idx uint8) *image.Paletted {
+		p := image.NewPaletted(r, pal)
+		for i := range p.Pix {
+			p.Pix[i] = idx
+		}
+		return p
+	}
+	// f0 red background; f1 greens (0,0) then clears it; f2 greens (1,1) but is
+	// undone; f3 greens (0,1) on the restored canvas.
+	g := &gif.GIF{
+		Image: []*image.Paletted{
+			fill(image.Rect(0, 0, 2, 2), 0),
+			fill(image.Rect(0, 0, 1, 1), 1),
+			fill(image.Rect(1, 1, 2, 2), 1),
+			fill(image.Rect(0, 1, 1, 2), 1),
+		},
+		Delay:    []int{10, 10, 10, 10},
+		Disposal: []byte{gif.DisposalNone, gif.DisposalBackground, gif.DisposalPrevious, gif.DisposalNone},
+		Config:   image.Config{ColorModel: pal, Width: 2, Height: 2},
+	}
+	var buf bytes.Buffer
+	if err := gif.EncodeAll(&buf, g); err != nil {
+		t.Fatalf("encode fixture: %v", err)
+	}
+	frames, _, err := gifFrames(buf.Bytes())
+	if err != nil {
+		t.Fatalf("gifFrames: %v", err)
+	}
+	if len(frames) != 4 {
+		t.Fatalf("got %d frames, want 4", len(frames))
+	}
+	at := func(fi, x, y int) color.RGBA { return frames[fi].RGBAAt(x, y) }
+	if at(0, 1, 1) != red {
+		t.Errorf("f0 (1,1) = %+v, want red background", at(0, 1, 1))
+	}
+	if at(1, 0, 0) != green || at(1, 1, 1) != red {
+		t.Errorf("f1 = %+v/%+v, want green(0,0) over red(1,1)", at(1, 0, 0), at(1, 1, 1))
+	}
+	if a := at(2, 0, 0).A; a != 0 { // DisposalBackground cleared (0,0) after f1
+		t.Errorf("f2 (0,0) alpha = %d, want 0 (DisposalBackground clear)", a)
+	}
+	if at(3, 1, 1) != red { // DisposalPrevious undid f2's green at (1,1)
+		t.Errorf("f3 (1,1) = %+v, want red (DisposalPrevious restore)", at(3, 1, 1))
+	}
+	if at(3, 0, 1) != green {
+		t.Errorf("f3 (0,1) = %+v, want green", at(3, 0, 1))
 	}
 }
 

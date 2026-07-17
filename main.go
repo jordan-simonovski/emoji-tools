@@ -26,6 +26,8 @@ Commands:
   party      Cycle the image through party-parrot rainbow colours
   party-blob Rainbow colour-cycle plus a bouncing wobble
   spin       3D coin-flip spin around the vertical axis
+  confetti   Rain confetti over your image (animated overlay)
+  bongocat   Bongo cat drumming on your image
 
 Run "emoji-tools <command> -h" for command-specific flags.
 `
@@ -57,6 +59,10 @@ func main() {
 		err = runPartyBlob(os.Args[2:])
 	case "spin":
 		err = runSpin(os.Args[2:])
+	case "confetti":
+		err = runConfetti(os.Args[2:])
+	case "bongocat":
+		err = runBongocat(os.Args[2:])
 	case "-h", "--help", "help":
 		fmt.Print(usage)
 	default:

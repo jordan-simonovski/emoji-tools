@@ -1,5 +1,7 @@
 /dist/
 /emoji-tools
-# Ignore generated example GIFs, but keep the embedded petpet hand frames.
+# Ignore generated example GIFs, but keep the embedded overlay/petpet assets.
 *.gif
 !assets/pet/*.gif
+!assets/confetti.gif
+!assets/bongocat.gif

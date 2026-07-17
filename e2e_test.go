@@ -240,14 +240,47 @@ func TestE2E_Spin(t *testing.T) {
 	if n := gifFrameCount(t, filepath.Join(dir, "sp.gif")); n != 8 {
 		t.Errorf("spin frames = %d, want 8", n)
 	}
-	if op := minOpaquePixels(t, filepath.Join(dir, "sp.gif")); op != 0 {
-		t.Errorf("spin: no fully edge-on (blank) frame; min opaque pixels = %d, want 0", op)
+	if lo, _ := opaqueRange(t, filepath.Join(dir, "sp.gif")); lo != 0 {
+		t.Errorf("spin: no fully edge-on (blank) frame; min opaque pixels = %d, want 0", lo)
 	}
 }
 
-// minOpaquePixels returns the smallest number of non-transparent pixels across
-// all frames of a GIF.
-func minOpaquePixels(t *testing.T, path string) int {
+func TestE2E_Confetti(t *testing.T) {
+	defer quiet(t)()
+	dir := t.TempDir()
+	pngIn, _ := writeFixtures(t, dir)
+	// -frames below the overlay's native count exercises subsampling.
+	if err := runConfetti([]string{pngIn, "-name", "cf", "-tile", "64", "-frames", "10", "-out", dir}); err != nil {
+		t.Fatalf("confetti: %v", err)
+	}
+	if n := gifFrameCount(t, filepath.Join(dir, "cf.gif")); n != 10 {
+		t.Errorf("confetti frames = %d, want 10 (subsampled)", n)
+	}
+	// The overlay must actually composite and animate: a no-op overlay would
+	// repeat the static base tile, giving an identical opaque count every frame.
+	if lo, hi := opaqueRange(t, filepath.Join(dir, "cf.gif")); hi <= lo {
+		t.Errorf("confetti frames don't vary (opaque range %d..%d); overlay not compositing", lo, hi)
+	}
+}
+
+func TestE2E_Bongocat(t *testing.T) {
+	defer quiet(t)()
+	dir := t.TempDir()
+	pngIn, _ := writeFixtures(t, dir)
+	if err := runBongocat([]string{pngIn, "-name", "bc", "-tile", "64", "-out", dir}); err != nil {
+		t.Fatalf("bongocat: %v", err)
+	}
+	if n := gifFrameCount(t, filepath.Join(dir, "bc.gif")); n != 2 {
+		t.Errorf("bongocat frames = %d, want 2", n)
+	}
+	if err := runBongocat([]string{pngIn, "-scale", "1.5", "-out", dir}); err == nil {
+		t.Error("bongocat accepted scale > 1; want error")
+	}
+}
+
+// opaqueRange returns the smallest and largest number of non-transparent pixels
+// across all frames of a GIF.
+func opaqueRange(t *testing.T, path string) (lo, hi int) {
 	t.Helper()
 	f, err := os.Open(path)
 	if err != nil {
@@ -258,7 +291,7 @@ func minOpaquePixels(t *testing.T, path string) int {
 	if err != nil {
 		t.Fatalf("decode gif %s: %v", path, err)
 	}
-	min := -1
+	lo = -1
 	for _, fr := range g.Image {
 		b, count := fr.Bounds(), 0
 		for y := b.Min.Y; y < b.Max.Y; y++ {
@@ -268,9 +301,12 @@ func minOpaquePixels(t *testing.T, path string) int {
 				}
 			}
 		}
-		if min < 0 || count < min {
-			min = count
+		if lo < 0 || count < lo {
+			lo = count
+		}
+		if count > hi {
+			hi = count
 		}
 	}
-	return min
+	return lo, hi
 }
