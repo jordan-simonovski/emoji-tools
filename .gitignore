@@ -1,0 +1,5 @@
+/dist/
+/emoji-tools
+# Ignore generated example GIFs, but keep the embedded petpet hand frames.
+*.gif
+!assets/pet/*.gif
