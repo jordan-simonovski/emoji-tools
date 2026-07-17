@@ -2,6 +2,6 @@
 /emoji-tools
 # Ignore generated example GIFs, but keep the embedded overlay/petpet assets.
 *.gif
-!assets/pet/*.gif
-!assets/confetti.gif
-!assets/bongocat.gif
+!internal/emoji/assets/pet/*.gif
+!internal/emoji/assets/confetti.gif
+!internal/emoji/assets/bongocat.gif
