@@ -2,6 +2,7 @@ package emoji
 
 import (
 	"bytes"
+	"fmt"
 	"image"
 	"image/color"
 	"image/draw"
@@ -21,28 +22,58 @@ func encodeGIF(path string, frames []*image.RGBA, delayCs int) error {
 	return encodeGIFDelays(path, frames, delays)
 }
 
+// maxEmojiBytes is Slack's file-size ceiling for a custom emoji (128 KiB). Slack
+// rejects anything larger even after its own downscale, so we must land under it.
+const maxEmojiBytes = 128 * 1024
+
+// colorBudgets are the opaque-palette sizes encodeGIFDelays tries, largest first,
+// stopping at the first GIF that fits under maxEmojiBytes. Each value is one less
+// than a power of two so that value+1 (the reserved transparent entry) lands on a
+// 2^n palette, shrinking image/gif's per-pixel LZW code size — the biggest size
+// lever short of dropping frames or resolution. Fewer colors trades fidelity for
+// fit, so we only step down when the richer palette overflows.
+var colorBudgets = []int{255, 127, 63, 31}
+
 // encodeGIFDelays writes an infinitely-looping animated GIF from RGBA frames,
 // each shown for delays[i] centiseconds. A dedicated palette index is reserved
 // for transparency (alpha < 128), so a dominant color can never be mistaken for
-// the transparent color.
+// the transparent color. The palette shrinks through colorBudgets until the
+// encoded GIF fits under Slack's size limit (or the smallest budget is reached).
 func encodeGIFDelays(path string, frames []*image.RGBA, delays []int) error {
-	pal, transpIdx := palettize(frames)
+	var buf bytes.Buffer
+	for i, colors := range colorBudgets {
+		buf.Reset()
+		if err := encodeGIFColors(&buf, frames, delays, colors); err != nil {
+			return err
+		}
+		if buf.Len() <= maxEmojiBytes || i == len(colorBudgets)-1 {
+			break // fits, or we're out of budgets to try
+		}
+	}
+	if err := os.WriteFile(path, buf.Bytes(), 0o644); err != nil {
+		os.Remove(path) // don't leave a truncated GIF behind
+		return err
+	}
+	if buf.Len() > maxEmojiBytes {
+		// Even the smallest palette overflowed. The file is written (still usable
+		// elsewhere) but Slack will reject it, so warn instead of reporting success.
+		fmt.Fprintf(os.Stderr, "warning: %s is %d bytes, over Slack's %d-byte emoji limit; try fewer frames or a smaller -tile\n",
+			path, buf.Len(), maxEmojiBytes)
+	}
+	return nil
+}
+
+// encodeGIFColors renders every frame against a shared palette of up to `colors`
+// opaque entries (plus one transparent) and writes the animated GIF to w.
+func encodeGIFColors(w *bytes.Buffer, frames []*image.RGBA, delays []int, colors int) error {
+	pal, transpIdx := palettize(frames, colors)
 	g := &gif.GIF{LoopCount: 0}
 	for i, fr := range frames {
 		g.Image = append(g.Image, toPaletted(fr, pal, transpIdx))
 		g.Delay = append(g.Delay, delays[i])
 		g.Disposal = append(g.Disposal, gif.DisposalBackground)
 	}
-	f, err := os.Create(path)
-	if err != nil {
-		return err
-	}
-	if err := gif.EncodeAll(f, g); err != nil {
-		f.Close()
-		os.Remove(path) // don't leave a truncated GIF behind
-		return err
-	}
-	return f.Close() // surface a flush/close error instead of reporting success
+	return gif.EncodeAll(w, g)
 }
 
 // gifFrames decodes an animated GIF into fully-composited RGBA frames plus each
@@ -106,11 +137,11 @@ func subsampleFrames(frames []*image.RGBA, delays []int, max int) ([]*image.RGBA
 	return outF, outD
 }
 
-// palettize quantizes the opaque colors (budget 255) across ALL frames and
+// palettize quantizes the opaque colors (budget `colors`) across ALL frames and
 // appends one fully transparent entry as the last index. Quantizing every frame
 // matters for commands like panic where frames differ in scale/color (frame 0 is
 // the most downscaled), so a single-frame palette would dull the sharper frames.
-func palettize(frames []*image.RGBA) (color.Palette, int) {
+func palettize(frames []*image.RGBA, colors int) (color.Palette, int) {
 	// Lay every frame side by side so the quantizer sees the whole animation's colors.
 	b := frames[0].Bounds()
 	montage := image.NewRGBA(image.Rect(0, 0, b.Dx()*len(frames), b.Dy()))
@@ -124,7 +155,7 @@ func palettize(frames []*image.RGBA) (color.Palette, int) {
 	// instead keep the transparent background as its own alpha-0 entry, which the
 	// encoder would pick first — rendering transparent pixels as opaque black.
 	q := quantize.MedianCutQuantizer{Aggregation: quantize.Mean}
-	pal := q.Quantize(make(color.Palette, 0, 255), montage)
+	pal := q.Quantize(make(color.Palette, 0, colors), montage)
 	transpIdx := len(pal)
 	pal = append(pal, color.RGBA{})
 	return pal, transpIdx

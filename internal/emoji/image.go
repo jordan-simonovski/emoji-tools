@@ -15,6 +15,7 @@ import (
 	"github.com/srwiley/oksvg"
 	"github.com/srwiley/rasterx"
 	xdraw "golang.org/x/image/draw"
+	"golang.org/x/image/math/f64"
 	_ "golang.org/x/image/webp"
 )
 
@@ -108,6 +109,28 @@ func scaleToWidth(src image.Image, w int) *image.RGBA {
 		h = 1
 	}
 	return scaleTo(src, w, h)
+}
+
+// rotateRGBA rotates src counter-clockwise by deg degrees about its center,
+// keeping the same canvas size (fine for small angles on sprites with transparent
+// margins). Pixels rotated out of frame are clipped; empty area stays transparent.
+func rotateRGBA(src *image.RGBA, deg float64) *image.RGBA {
+	b := src.Bounds()
+	w, h := b.Dx(), b.Dy()
+	dst := image.NewRGBA(image.Rect(0, 0, w, h))
+	rad := -deg * math.Pi / 180 // negate: image Y grows downward, so CCW is -θ
+	sin, cos := math.Sin(rad), math.Cos(rad)
+	// Transform maps absolute src coords; the (0,0)-origin dst has its own center.
+	scx := float64(b.Min.X) + float64(w)/2
+	scy := float64(b.Min.Y) + float64(h)/2
+	dcx, dcy := float64(w)/2, float64(h)/2
+	// src->dst affine: rotate each src point about the src center onto the dst center.
+	s2d := f64.Aff3{
+		cos, -sin, dcx - cos*scx + sin*scy,
+		sin, cos, dcy - sin*scx - cos*scy,
+	}
+	xdraw.CatmullRom.Transform(dst, s2d, src, b, xdraw.Over, nil)
+	return dst
 }
 
 func rasterizeSVG(path string, w, h int) (*image.RGBA, error) {

@@ -5,6 +5,7 @@ import (
 	"image"
 	"image/color"
 	"image/gif"
+	"os"
 	"testing"
 )
 
@@ -124,6 +125,89 @@ func TestSubsampleFrames(t *testing.T) {
 	// max < 1 is a no-op guard (callers validate, but the branch must hold).
 	if f, _ := subsampleFrames(frames, delays, 0); len(f) != n {
 		t.Errorf("subsampleFrames(max=0) returned %d frames, want %d (no-op)", len(f), n)
+	}
+}
+
+// A full-size, high-color-count animation must still land under Slack's byte
+// limit: encodeGIFDelays should shrink its palette until the GIF fits.
+func TestEncodeGIFFitsSizeLimit(t *testing.T) {
+	const tile, n = 128, 20
+	frames := make([]*image.RGBA, n)
+	delays := make([]int, n)
+	for f := range frames {
+		fr := image.NewRGBA(image.Rect(0, 0, tile, tile))
+		for y := 0; y < tile; y++ {
+			for x := 0; x < tile; x++ {
+				// High-entropy, per-frame-varying colors so a 255-color palette
+				// would blow past the limit and force the ladder to step down.
+				fr.Set(x, y, color.RGBA{uint8(x*7 + f), uint8(y*13 + f*3), uint8(x*y + f*5), 255})
+			}
+		}
+		frames[f], delays[f] = fr, 5
+	}
+	path := t.TempDir() + "/big.gif"
+	if err := encodeGIFDelays(path, frames, delays); err != nil {
+		t.Fatalf("encodeGIFDelays: %v", err)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("stat: %v", err)
+	}
+	if info.Size() > maxEmojiBytes {
+		t.Errorf("GIF is %d bytes, want <= %d (Slack limit)", info.Size(), maxEmojiBytes)
+	}
+	// Bracket the ladder: the top budget must overflow so a step-down was actually
+	// required. Without this, the test would still pass if the shrink logic were
+	// removed and the input merely happened to fit at 255 colors.
+	var full bytes.Buffer
+	if err := encodeGIFColors(&full, frames, delays, colorBudgets[0]); err != nil {
+		t.Fatalf("encodeGIFColors(top budget): %v", err)
+	}
+	if full.Len() <= maxEmojiBytes {
+		t.Fatalf("top budget produced %d bytes (<= %d); test no longer exercises the ladder", full.Len(), maxEmojiBytes)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	got, _, err := gifFrames(data)
+	if err != nil {
+		t.Fatalf("decode result: %v", err)
+	}
+	if len(got) != n { // shrinking the palette must not drop frames
+		t.Errorf("decoded %d frames, want %d", len(got), n)
+	}
+}
+
+// rotateRGBA hand-rolls an affine matrix, so pin it like TestHueRotateIdentity:
+// a zero-degree rotation must be a byte-exact identity (catches a sign flip or
+// transposed coefficient), and a known angle must move mass the right way (CCW).
+func TestRotateRGBA(t *testing.T) {
+	const size = 20
+	src := image.NewRGBA(image.Rect(0, 0, size, size))
+	for y := 0; y < size; y++ {
+		for x := 0; x < size; x++ {
+			src.Set(x, y, color.RGBA{uint8(x * 12), uint8(y * 12), 64, 255})
+		}
+	}
+	if got := rotateRGBA(src, 0); !bytes.Equal(got.Pix, src.Pix) {
+		t.Errorf("rotateRGBA(0) is not an identity — matrix likely wrong")
+	}
+
+	// A block on the right-center, rotated 90° CCW about the center, must land at
+	// the top-center (right -> up). This fixes the rotation direction/sign.
+	block := image.NewRGBA(image.Rect(0, 0, size, size))
+	for y := 8; y <= 12; y++ {
+		for x := 15; x < size; x++ {
+			block.Set(x, y, color.RGBA{255, 255, 255, 255})
+		}
+	}
+	rot := rotateRGBA(block, 90)
+	if rot.RGBAAt(size/2, 3).A == 0 {
+		t.Errorf("after 90° CCW, top-center is empty — right-side mass did not move up")
+	}
+	if rot.RGBAAt(size-3, size/2).A != 0 {
+		t.Errorf("after 90° CCW, right-center still opaque — block did not rotate away")
 	}
 }
 
