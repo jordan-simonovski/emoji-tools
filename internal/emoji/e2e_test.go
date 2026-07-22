@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"image/draw"
 	"image/gif"
 	"image/png"
 	"os"
@@ -276,6 +277,97 @@ func TestE2E_Bongocat(t *testing.T) {
 	if err := runBongocat([]string{pngIn, "-scale", "1.5", "-out", dir}); err == nil {
 		t.Error("bongocat accepted scale > 1; want error")
 	}
+}
+
+func TestE2E_Statham(t *testing.T) {
+	defer quiet(t)()
+	dir := t.TempDir()
+	// The base statham.gif is itself animated (a dancing figure), so a varying
+	// opaque-pixel count proves nothing about the overlay. Instead feed a solid
+	// cyan fixture — a color absent from the bronze source — and assert cyan
+	// pixels land in the output, which only a working head overlay can produce.
+	cyanIn := filepath.Join(dir, "cyan.png")
+	writeSolidPNG(t, cyanIn, color.RGBA{0, 255, 255, 255})
+	if err := runStatham([]string{cyanIn, "-name", "st", "-tile", "64", "-out", dir}); err != nil {
+		t.Fatalf("statham: %v", err)
+	}
+	const wantFrames = 30 // one output frame per source frame in statham.gif
+	if n := gifFrameCount(t, filepath.Join(dir, "st.gif")); n != wantFrames {
+		t.Errorf("statham frames = %d, want %d", n, wantFrames)
+	}
+	if n := countColorNear(t, filepath.Join(dir, "st.gif"), color.RGBA{0, 255, 255, 255}, 40); n < 100 {
+		t.Errorf("statham: only %d cyan pixels in output; overlay not compositing onto the figure", n)
+	}
+
+	// Preview needs no input and stamps a magenta head box; assert the box drew.
+	if err := runStatham([]string{"-preview", "-name", "stp", "-tile", "64", "-out", dir}); err != nil {
+		t.Fatalf("statham -preview: %v", err)
+	}
+	if n := gifFrameCount(t, filepath.Join(dir, "stp.gif")); n != wantFrames {
+		t.Errorf("statham preview frames = %d, want %d", n, wantFrames)
+	}
+	if n := countColorNear(t, filepath.Join(dir, "stp.gif"), color.RGBA{255, 0, 255, 255}, 40); n < 30 {
+		t.Errorf("statham -preview: only %d magenta pixels; head box not drawn", n)
+	}
+	// -preview=true (the standard Go bool-flag form) must route to preview, not error.
+	if err := runStatham([]string{"-preview=true", "-name", "stp2", "-tile", "64", "-out", dir}); err != nil {
+		t.Fatalf("statham -preview=true: %v", err)
+	}
+
+	// Error paths, mirroring the sibling makers' negative assertions.
+	if err := runStatham([]string{cyanIn, "-tile", "9999", "-out", dir}); err == nil {
+		t.Error("statham accepted tile > max; want error")
+	}
+	if err := runStatham([]string{cyanIn, "-scale", "0", "-out", dir}); err == nil {
+		t.Error("statham accepted scale <= 0; want error")
+	}
+	if err := runStatham([]string{"-out", dir}); err == nil {
+		t.Error("statham accepted no input without -preview; want error")
+	}
+}
+
+// writeSolidPNG writes a 64x64 image filled with c.
+func writeSolidPNG(t *testing.T, path string, c color.RGBA) {
+	t.Helper()
+	img := image.NewRGBA(image.Rect(0, 0, 64, 64))
+	draw.Draw(img, img.Bounds(), &image.Uniform{c}, image.Point{}, draw.Src)
+	f, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := png.Encode(f, img); err != nil {
+		t.Fatal(err)
+	}
+	f.Close()
+}
+
+// countColorNear totals, across all GIF frames, the pixels within tol (per
+// channel) of target — used to confirm a distinctly-colored overlay composited.
+func countColorNear(t *testing.T, path string, target color.RGBA, tol int) int {
+	t.Helper()
+	f, err := os.Open(path)
+	if err != nil {
+		t.Fatalf("open %s: %v", path, err)
+	}
+	defer f.Close()
+	g, err := gif.DecodeAll(f)
+	if err != nil {
+		t.Fatalf("decode gif %s: %v", path, err)
+	}
+	near := func(a, b uint8) bool { return int(a)-int(b) <= tol && int(b)-int(a) <= tol }
+	count := 0
+	for _, fr := range g.Image {
+		b := fr.Bounds()
+		for y := b.Min.Y; y < b.Max.Y; y++ {
+			for x := b.Min.X; x < b.Max.X; x++ {
+				r, gg, bb, _ := fr.At(x, y).RGBA()
+				if near(uint8(r>>8), target.R) && near(uint8(gg>>8), target.G) && near(uint8(bb>>8), target.B) {
+					count++
+				}
+			}
+		}
+	}
+	return count
 }
 
 // opaqueRange returns the smallest and largest number of non-transparent pixels

@@ -28,6 +28,7 @@ Commands:
   spin       3D coin-flip spin around the vertical axis
   confetti   Rain confetti over your image (animated overlay)
   bongocat   Bongo cat drumming on your image
+  statham    Trace your image over Jason Statham's head as he dances
 
 Run "emoji-tools <command> -h" for command-specific flags.
 `
@@ -65,6 +66,8 @@ func Run(args []string) int {
 		err = runConfetti(args[1:])
 	case "bongocat":
 		err = runBongocat(args[1:])
+	case "statham":
+		err = runStatham(args[1:])
 	case "-h", "--help", "help":
 		fmt.Print(usage)
 		return 0

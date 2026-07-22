@@ -42,6 +42,27 @@ func parseInput(fs *flag.FlagSet, args []string) (string, error) {
 	return input, nil
 }
 
+// parseInputOpt is parseInput with an optional positional: it returns "" (no
+// error) when no input file is given, for commands like statham -preview that
+// don't need one. Callers enforce their own required-input rule after parsing.
+func parseInputOpt(fs *flag.FlagSet, args []string) (string, error) {
+	if err := fs.Parse(args); err != nil {
+		return "", err
+	}
+	rest := fs.Args()
+	if len(rest) == 0 {
+		return "", nil
+	}
+	input := rest[0]
+	if err := fs.Parse(rest[1:]); err != nil {
+		return "", err
+	}
+	if fs.NArg() != 0 {
+		return "", fmt.Errorf("unexpected extra arguments: %v", fs.Args())
+	}
+	return input, nil
+}
+
 // orName returns the flag value if set, else a name derived from the path.
 func orName(flagVal, path string) string {
 	if flagVal != "" {
