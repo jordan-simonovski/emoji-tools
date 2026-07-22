@@ -29,6 +29,7 @@ Commands:
   confetti   Rain confetti over your image (animated overlay)
   bongocat   Bongo cat drumming on your image
   statham    Trace your image over Jason Statham's head as he dances
+  version    Print the emoji-tools version
 
 Run "emoji-tools <command> -h" for command-specific flags.
 `
@@ -68,6 +69,9 @@ func Run(args []string) int {
 		err = runBongocat(args[1:])
 	case "statham":
 		err = runStatham(args[1:])
+	case "version", "-version", "--version":
+		fmt.Printf("emoji-tools %s\n", Version)
+		return 0
 	case "-h", "--help", "help":
 		fmt.Print(usage)
 		return 0
@@ -82,5 +86,6 @@ func Run(args []string) int {
 		fmt.Fprintln(os.Stderr, "error:", err)
 		return 1
 	}
+	maybeNotifyUpdate() // best-effort upgrade nudge after a successful command
 	return 0
 }
