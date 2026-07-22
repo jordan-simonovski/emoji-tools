@@ -31,6 +31,11 @@ brew install jordan-simonovski/tap/emoji-tools
 go install github.com/jordan-simonovski/emoji-tools@latest
 ```
 
+`emoji-tools version` prints the build version. Released builds check GitHub for a
+newer release at most once a day and, if one exists, print a one-line upgrade nudge.
+The check is skipped for `go install`/source builds, in CI, and when output isn't a
+terminal; set `EMOJI_TOOLS_NO_UPDATE_CHECK=1` to disable it entirely.
+
 ## Usage
 
 ```sh
