@@ -1,6 +1,6 @@
 # emoji-tools
 
-Turn any logo or image into Slack emojis. One binary, twelve makers:
+Turn any logo or image into Slack emojis. One binary, fourteen makers:
 
 | Command | What it makes |
 |---|---|
@@ -16,6 +16,8 @@ Turn any logo or image into Slack emojis. One binary, twelve makers:
 | `spin` | A spinning-coin 3D flip around the vertical axis. |
 | `confetti` | Rains confetti over your image (animated overlay). |
 | `bongocat` | Bongo cat drumming on your image, overlaid so the cat sits in front. |
+| `statham` | Traces your image over Jason Statham's head as he dances. |
+| `fistpump` | A shaking fist pumping your image in the air, mirrorable for either side of another emoji. |
 
 Every output is a **square** image within Slack's limits.
 
@@ -145,6 +147,35 @@ emoji-tools bongocat logo.png -scale 0.5 -dur 90    # smaller drum, faster drumm
 
 Bongo cat drumming on your image: your image is the drum, and the cat is overlaid
 on top so its body cuts off the top of the image — it reads as the cat in front.
+
+### statham
+
+```sh
+emoji-tools statham clickhouse-logo.svg              # -> statham_clickhouse-logo.gif
+emoji-tools statham logo.png -scale 1.2 -dy -3       # bigger head, nudged up
+emoji-tools statham -preview                         # outline the detected head box
+```
+
+Your image rides on Jason Statham's head as he dances. The head is detected per
+frame, so the image tracks it; `-preview` draws the detected box instead of your
+image so you can check the fit before committing to `-scale`/`-dx`/`-dy`.
+
+### fistpump
+
+```sh
+emoji-tools fistpump clickhouse-logo.svg             # -> fistpump_clickhouse-logo_left.gif
+emoji-tools fistpump logo.png -side right            # -> fistpump_logo_right.gif (arm mirrored)
+emoji-tools fistpump logo.png -scale 0.6 -dy 4       # bigger logo, nudged down
+emoji-tools fistpump -preview                        # outline where the logo lands
+```
+
+A fist pumping your logo in the air. `-side` picks which side of the neighbouring
+emoji the arm sits on — `right` mirrors the arm but not the logo, so text stays
+readable. Generate both and paste `:fistpump_x_left::something::fistpump_x_right:`.
+
+The logo sits just above the fist, so `-scale` past roughly `0.6` runs it off the
+top of the tile (and by different amounts in each frame). Pair a bigger `-scale`
+with a positive `-dy` to bring it back into frame.
 
 ## Slack emoji limits
 
