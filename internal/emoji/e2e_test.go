@@ -326,6 +326,118 @@ func TestE2E_Statham(t *testing.T) {
 	}
 }
 
+func TestE2E_Fistpump(t *testing.T) {
+	defer quiet(t)()
+	dir := t.TempDir()
+	// Same trick as statham: a solid cyan fixture proves the held image composited,
+	// since the arm sprite is yellow/black only.
+	cyanIn := filepath.Join(dir, "cyan.png")
+	writeSolidPNG(t, cyanIn, color.RGBA{0, 255, 255, 255})
+	if err := runFistpump([]string{cyanIn, "-name", "fp", "-tile", "64", "-out", dir}); err != nil {
+		t.Fatalf("fistpump: %v", err)
+	}
+	if n := gifFrameCount(t, filepath.Join(dir, "fp.gif")); n != 2 {
+		t.Errorf("fistpump frames = %d, want 2", n)
+	}
+	if n := countColorNear(t, filepath.Join(dir, "fp.gif"), color.RGBA{0, 255, 255, 255}, 40); n < 100 {
+		t.Errorf("fistpump: only %d cyan pixels in output; held image not compositing", n)
+	}
+	// The pump IS the animation: the fist swings between the two frames and drags
+	// the held image with it. Frozen fist coordinates would still satisfy every
+	// other assertion here, so check the image actually moves.
+	if c := centroidsX(t, filepath.Join(dir, "fp.gif"), isCyan); len(c) != 2 {
+		t.Errorf("fistpump: got %d frames of held image, want 2", len(c))
+	} else if d := c[0] - c[1]; d > -5 && d < 5 {
+		t.Errorf("fistpump: held image barely moves between frames (%.1f -> %.1f); the pump is missing", c[0], c[1])
+	}
+
+	// -side right with a real image. Preview skips the held-image draw entirely,
+	// so without this the mirror branch is never exercised alongside compositing --
+	// which is exactly the "mirrors the arm, not the logo" contract.
+	if err := runFistpump([]string{cyanIn, "-side", "right", "-name", "fpr2", "-tile", "64", "-out", dir}); err != nil {
+		t.Fatalf("fistpump -side right: %v", err)
+	}
+	if n := countColorNear(t, filepath.Join(dir, "fpr2.gif"), color.RGBA{0, 255, 255, 255}, 40); n < 100 {
+		t.Errorf("fistpump -side right: only %d cyan pixels; held image not compositing on the mirrored side", n)
+	}
+
+	// -side right must mirror the arm. Compare the previews' opaque centroids: a
+	// true mirror puts them equidistant from the tile's midline, which a plain
+	// pixel-equality check can't assert (the box/image rects round asymmetrically).
+	const tile = 64
+	if err := runFistpump([]string{"-preview", "-name", "fpl", "-tile", "64", "-out", dir}); err != nil {
+		t.Fatalf("fistpump -preview: %v", err)
+	}
+	if err := runFistpump([]string{"-preview", "-side", "right", "-name", "fpr", "-tile", "64", "-out", dir}); err != nil {
+		t.Fatalf("fistpump -preview -side right: %v", err)
+	}
+	l := centroidsX(t, filepath.Join(dir, "fpl.gif"), isOpaque)[0]
+	r := centroidsX(t, filepath.Join(dir, "fpr.gif"), isOpaque)[0]
+	if diff := l + r - (tile - 1); diff < -2 || diff > 2 {
+		t.Errorf("fistpump centroids: left %.1f + right %.1f = %.1f, want ~%d (mirrored)", l, r, l+r, tile-1)
+	}
+	if l >= r { // the native arm leans left; mirrored it must lean right
+		t.Errorf("fistpump -side right centroid %.1f is not right of left's %.1f", r, l)
+	}
+	if n := countColorNear(t, filepath.Join(dir, "fpl.gif"), color.RGBA{255, 0, 255, 255}, 40); n < 30 {
+		t.Errorf("fistpump -preview: only %d magenta pixels; fist box not drawn", n)
+	}
+
+	// Error paths, mirroring the sibling makers' negative assertions.
+	if err := runFistpump([]string{cyanIn, "-tile", "9999", "-out", dir}); err == nil {
+		t.Error("fistpump accepted tile > max; want error")
+	}
+	if err := runFistpump([]string{cyanIn, "-scale", "1.5", "-out", dir}); err == nil {
+		t.Error("fistpump accepted scale > 1; want error")
+	}
+	if err := runFistpump([]string{cyanIn, "-side", "sideways", "-out", dir}); err == nil {
+		t.Error("fistpump accepted a bogus -side; want error")
+	}
+	if err := runFistpump([]string{"-out", dir}); err == nil {
+		t.Error("fistpump accepted no input without -preview; want error")
+	}
+}
+
+func isOpaque(_, _, _ uint8, a uint8) bool { return a > 0 }
+
+// isCyan matches the writeSolidPNG cyan fixture with enough slack for the GIF
+// palette quantizer to shift it.
+func isCyan(r, g, b, a uint8) bool { return a > 0 && r < 80 && g > 180 && b > 180 }
+
+// centroidsX returns the mean x of every pixel matching keep, one entry per GIF
+// frame — a cheap handle on which way a sprite leans and whether it moves.
+func centroidsX(t *testing.T, path string, keep func(r, g, b, a uint8) bool) []float64 {
+	t.Helper()
+	f, err := os.Open(path)
+	if err != nil {
+		t.Fatalf("open %s: %v", path, err)
+	}
+	defer f.Close()
+	g, err := gif.DecodeAll(f)
+	if err != nil {
+		t.Fatalf("decode gif %s: %v", path, err)
+	}
+	out := make([]float64, 0, len(g.Image))
+	for i, fr := range g.Image {
+		b := fr.Bounds()
+		sum, n := 0, 0
+		for y := b.Min.Y; y < b.Max.Y; y++ {
+			for x := b.Min.X; x < b.Max.X; x++ {
+				cr, cg, cb, ca := fr.At(x, y).RGBA()
+				if keep(uint8(cr>>8), uint8(cg>>8), uint8(cb>>8), uint8(ca>>8)) {
+					sum += x
+					n++
+				}
+			}
+		}
+		if n == 0 {
+			t.Fatalf("%s: frame %d has no matching pixels", path, i)
+		}
+		out = append(out, float64(sum)/float64(n))
+	}
+	return out
+}
+
 // writeSolidPNG writes a 64x64 image filled with c.
 func writeSolidPNG(t *testing.T, path string, c color.RGBA) {
 	t.Helper()
