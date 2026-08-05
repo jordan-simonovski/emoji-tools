@@ -16,21 +16,22 @@ Usage:
   emoji-tools <command> [flags] <input>
 
 Commands:
-  grid       Split an image into an NxM grid of square emoji tiles
-  scroll     Seamless horizontal-scroll looping GIF (a "train" of the logo)
-  intensify  Shaking "<x>-intensifies" animated GIF
-  yells-at   Abe Simpson yelling at your image
-  uwu        Overlay a uwu face onto your image
-  petpet     A hand patting your image (petpet meme)
-  panic      Frantic zoom-pulse + shake animation
-  party      Cycle the image through party-parrot rainbow colours
-  party-blob Rainbow colour-cycle plus a bouncing wobble
-  spin       3D coin-flip spin around the vertical axis
-  confetti   Rain confetti over your image (animated overlay)
-  bongocat   Bongo cat drumming on your image
-  statham    Trace your image over Jason Statham's head as he dances
-  fistpump   A shaking fist pumping your image in the air
-  version    Print the emoji-tools version
+  grid          Split an image into an NxM grid of square emoji tiles
+  scroll        Seamless horizontal-scroll looping GIF (a "train" of the logo)
+  intensify     Shaking "<x>-intensifies" animated GIF
+  yells-at      Abe Simpson yelling at your image
+  uwu           Overlay a uwu face onto your image
+  petpet        A hand patting your image (petpet meme)
+  panic         Frantic zoom-pulse + shake animation
+  party         Cycle the image through party-parrot rainbow colours
+  party-blob    Rainbow colour-cycle plus a bouncing wobble
+  spin          3D coin-flip spin around the vertical axis
+  content-aware Content-aware squeeze that swells the subject and deep-fries it
+  confetti      Rain confetti over your image (animated overlay)
+  bongocat      Bongo cat drumming on your image
+  statham       Trace your image over Jason Statham's head as he dances
+  fistpump      A shaking fist pumping your image in the air
+  version       Print the emoji-tools version
 
 Run "emoji-tools <command> -h" for command-specific flags.
 `
@@ -64,6 +65,8 @@ func Run(args []string) int {
 		err = runPartyBlob(args[1:])
 	case "spin":
 		err = runSpin(args[1:])
+	case "content-aware":
+		err = runContentAware(args[1:])
 	case "confetti":
 		err = runConfetti(args[1:])
 	case "bongocat":

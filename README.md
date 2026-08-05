@@ -1,6 +1,6 @@
 # emoji-tools
 
-Turn any logo or image into Slack emojis. One binary, fourteen makers:
+Turn any logo or image into Slack emojis. One binary, fifteen makers:
 
 | Command | What it makes |
 |---|---|
@@ -14,6 +14,7 @@ Turn any logo or image into Slack emojis. One binary, fourteen makers:
 | `party` | Cycles the image through party-parrot rainbow colours. |
 | `party-blob` | The rainbow colour-cycle plus a bouncing squash-and-stretch wobble. |
 | `spin` | A spinning-coin 3D flip around the vertical axis. |
+| `content-aware` | The content-aware-scale meme: the subject swells and warps as the image squeezes in, deep-frying as it goes. |
 | `confetti` | Rains confetti over your image (animated overlay). |
 | `bongocat` | Bongo cat drumming on your image, overlaid so the cat sits in front. |
 | `statham` | Traces your image over Jason Statham's head as he dances. |
@@ -127,6 +128,23 @@ emoji-tools spin logo.svg -frames 16 -dur 45         # smoother, faster spin
 
 A 3D coin-flip around the vertical axis: the image thins to an edge and shows its
 mirror on the way round.
+
+### content-aware
+
+```sh
+emoji-tools content-aware cat.png                     # -> cat_content_aware.gif
+emoji-tools content-aware cat.png -warp 0.7           # more mangling
+emoji-tools content-aware logo.svg -warp 0 -stretch 1 # plain zoom + fry, no carve
+```
+
+Seam-carves the image smaller every frame — flat areas collapse, features keep
+their size and swell — then stretches it back to a square, so the subject
+morphs as it grows instead of just scaling up. Deep-fries harder the further in
+it goes, then bounces back out so the loop is seamless.
+
+`-warp` sets how far the carve goes, `-stretch` how much taller than wide the
+subject ends up, `-zoom` the extra crop-in on top, and `-fry` the
+saturation/contrast/grain crunch. All of them peak mid-loop and unwind.
 
 ### confetti
 

@@ -293,3 +293,57 @@ func TestScrollSeamless(t *testing.T) {
 		}
 	}
 }
+
+// The point of seam carving over a plain resize: the detail has to survive while
+// the flat background is eaten. A 4px stripe on black should come through a
+// 40%-narrower carve at its full width -- a plain resize would leave it 2px.
+// Both axes are checked; carveTo carves rows by transposing, an easy thing to
+// break without noticing.
+func TestCarveKeepsDetail(t *testing.T) {
+	stripe := func(w, h int, vertical bool) *image.RGBA {
+		img := image.NewRGBA(image.Rect(0, 0, w, h))
+		for y := 0; y < h; y++ {
+			for x := 0; x < w; x++ {
+				c := color.RGBA{0, 0, 0, 255}
+				if p := x; vertical && p >= 18 && p < 22 {
+					c = color.RGBA{255, 255, 255, 255}
+				} else if p := y; !vertical && p >= 18 && p < 22 {
+					c = color.RGBA{255, 255, 255, 255}
+				}
+				img.Set(x, y, c)
+			}
+		}
+		return img
+	}
+	count := func(img *image.RGBA) int {
+		n := 0
+		b := img.Bounds()
+		for y := b.Min.Y; y < b.Max.Y; y++ {
+			for x := b.Min.X; x < b.Max.X; x++ {
+				if img.RGBAAt(x, y).R > 200 {
+					n++
+				}
+			}
+		}
+		return n
+	}
+
+	for _, tc := range []struct {
+		name       string
+		src        *image.RGBA
+		w, h       int
+		wantStripe int
+	}{
+		{"columns", stripe(40, 20, true), 24, 20, 4 * 20},
+		{"rows", stripe(20, 40, false), 20, 24, 4 * 20},
+	} {
+		got := carveTo(tc.src, tc.w, tc.h)
+		if w, h := got.Bounds().Dx(), got.Bounds().Dy(); w != tc.w || h != tc.h {
+			t.Errorf("%s: carveTo size = %dx%d, want %dx%d", tc.name, w, h, tc.w, tc.h)
+			continue
+		}
+		if n := count(got); n < tc.wantStripe {
+			t.Errorf("%s: stripe pixels = %d, want >= %d (carve ate the detail)", tc.name, n, tc.wantStripe)
+		}
+	}
+}
