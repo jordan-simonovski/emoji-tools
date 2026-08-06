@@ -514,3 +514,59 @@ func opaqueRange(t *testing.T, path string) (lo, hi int) {
 	}
 	return lo, hi
 }
+
+func TestE2E_ContentAware(t *testing.T) {
+	defer quiet(t)()
+	dir := t.TempDir()
+	pngIn, _ := writeFixtures(t, dir)
+	if err := runContentAware([]string{pngIn, "-name", "ca", "-tile", "64", "-frames", "7", "-out", dir}); err != nil {
+		t.Fatalf("content-aware: %v", err)
+	}
+	path := filepath.Join(dir, "ca.gif")
+	if n := gifFrameCount(t, path); n != 7 {
+		t.Errorf("content-aware frames = %d, want 7", n)
+	}
+
+	f, err := os.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	g, err := gif.DecodeAll(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	same := func(a, b *image.Paletted) bool {
+		if len(a.Pix) != len(b.Pix) {
+			return false
+		}
+		for i := range a.Pix {
+			if a.Pix[i] != b.Pix[i] {
+				return false
+			}
+		}
+		return true
+	}
+	// The animation squeezes in and bounces back out, so every frame must match
+	// its mirror, and the peak must actually differ from where it started.
+	for i := 0; i < len(g.Image)/2; i++ {
+		if j := len(g.Image) - 1 - i; !same(g.Image[i], g.Image[j]) {
+			t.Errorf("frame %d != frame %d; the loop doesn't bounce back", i, j)
+		}
+	}
+	if same(g.Image[0], g.Image[3]) {
+		t.Error("peak frame is identical to the first; nothing was carved or fried")
+	}
+
+	for _, bad := range [][]string{
+		{pngIn, "-tile", "300", "-out", dir},
+		{pngIn, "-tile", "64", "-frames", "2", "-out", dir},
+		{pngIn, "-tile", "64", "-warp", "1.5", "-out", dir},
+		{pngIn, "-tile", "64", "-zoom", "1e9", "-out", dir},
+		{pngIn, "-tile", "64", "-fry", "NaN", "-out", dir},
+	} {
+		if err := runContentAware(bad); err == nil {
+			t.Errorf("content-aware accepted %v; want error", bad)
+		}
+	}
+}
