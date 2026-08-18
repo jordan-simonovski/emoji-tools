@@ -1,6 +1,7 @@
 package emoji
 
 import (
+	"bytes"
 	"fmt"
 	"image"
 	"image/color"
@@ -9,6 +10,7 @@ import (
 	"image/png"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -569,4 +571,253 @@ func TestE2E_ContentAware(t *testing.T) {
 			t.Errorf("content-aware accepted %v; want error", bad)
 		}
 	}
+}
+
+// inkBands returns the row span of each run of consecutive rows containing
+// opaque pixels — i.e. where each line of text sits and how tall it is.
+func inkBands(t *testing.T, path string) [][2]int {
+	t.Helper()
+	f, err := os.Open(path)
+	if err != nil {
+		t.Fatalf("open %s: %v", path, err)
+	}
+	defer f.Close()
+	img, err := png.Decode(f)
+	if err != nil {
+		t.Fatalf("decode %s: %v", path, err)
+	}
+	b := img.Bounds()
+	var bands [][2]int
+	start := -1
+	for y := b.Min.Y; y < b.Max.Y; y++ {
+		row := false
+		for x := b.Min.X; x < b.Max.X && !row; x++ {
+			_, _, _, a := img.At(x, y).RGBA()
+			row = a > 0
+		}
+		switch {
+		case row && start < 0:
+			start = y
+		case !row && start >= 0:
+			bands = append(bands, [2]int{start, y - 1})
+			start = -1
+		}
+	}
+	if start >= 0 {
+		bands = append(bands, [2]int{start, b.Max.Y - 1})
+	}
+	return bands
+}
+
+// inkColumns returns the leftmost and rightmost opaque columns, so a test can
+// assert the text actually reaches the tile edges.
+func inkColumns(t *testing.T, path string) (int, int) {
+	t.Helper()
+	f, err := os.Open(path)
+	if err != nil {
+		t.Fatalf("open %s: %v", path, err)
+	}
+	defer f.Close()
+	img, err := png.Decode(f)
+	if err != nil {
+		t.Fatalf("decode %s: %v", path, err)
+	}
+	b := img.Bounds()
+	lo, hi := b.Max.X, b.Min.X-1
+	for x := b.Min.X; x < b.Max.X; x++ {
+		for y := b.Min.Y; y < b.Max.Y; y++ {
+			if _, _, _, a := img.At(x, y).RGBA(); a > 0 {
+				if x < lo {
+					lo = x
+				}
+				hi = x
+				break
+			}
+		}
+	}
+	return lo, hi
+}
+
+func countPNGColor(t *testing.T, path string, want color.RGBA) int {
+	t.Helper()
+	f, err := os.Open(path)
+	if err != nil {
+		t.Fatalf("open %s: %v", path, err)
+	}
+	defer f.Close()
+	img, err := png.Decode(f)
+	if err != nil {
+		t.Fatalf("decode %s: %v", path, err)
+	}
+	b, n := img.Bounds(), 0
+	for y := b.Min.Y; y < b.Max.Y; y++ {
+		for x := b.Min.X; x < b.Max.X; x++ {
+			r, g, bb, a := img.At(x, y).RGBA()
+			if a == 0xffff && uint8(r>>8) == want.R && uint8(g>>8) == want.G && uint8(bb>>8) == want.B {
+				n++
+			}
+		}
+	}
+	return n
+}
+
+func TestE2E_Text(t *testing.T) {
+	defer quiet(t)()
+	dir := t.TempDir()
+	out := filepath.Join(dir, "t.png")
+
+	// "MM" and "II" are deliberately lopsided: one is far wider than the other at
+	// the same cap height, so a per-line fit-to-width would give them obviously
+	// different heights while the shared scale keeps them equal.
+	if err := runText([]string{"mm", "ii", "-out", out}); err != nil { // flags after the words
+		t.Fatalf("text: %v", err)
+	}
+	if w, h := pngDims(t, out); w != 128 || h != 128 {
+		t.Errorf("text = %dx%d, want square 128x128", w, h)
+	}
+	// One word per line is the layout contract: two words are two ink bands with
+	// the leading gap between them, not one squashed line.
+	bands := inkBands(t, out)
+	if len(bands) != 2 {
+		t.Fatalf("text %q gave %d ink bands, want 2 (one per word)", "mm ii", len(bands))
+	}
+	// All lines share one scale, so the caps come out the same height. Without
+	// that, "II" (much narrower) would be scaled up far taller than "MM".
+	h0, h1 := bands[0][1]-bands[0][0], bands[1][1]-bands[1][0]
+	if d := h0 - h1; d < -2 || d > 2 {
+		t.Errorf("line heights %d and %d differ; the lines are not sharing one scale", h0, h1)
+	}
+	// Scaled up until it hits an edge — whichever edge binds first. Here the
+	// stack is what fills the tile; for a single wide word it is the sides.
+	lo, hi := inkColumns(t, out)
+	cols, rows := hi-lo+1, bands[len(bands)-1][1]-bands[0][0]+1
+	if cols < 126 && rows < 126 {
+		t.Errorf("ink spans %d cols x %d rows of 128; the text is not scaled up to an edge", cols, rows)
+	}
+	if n := countPNGColor(t, out, color.RGBA{0xdd, 0x1c, 0x22, 255}); n < 500 {
+		t.Errorf("text: only %d pixels of the same-tbh red; wrong colour or nothing drawn", n)
+	}
+
+	// Words keep their input order top to bottom. "I" is much narrower than "MMMM",
+	// so the narrower band has to be the top one.
+	orderOut := filepath.Join(dir, "order.png")
+	if err := runText([]string{"i", "mmmm", "-out", orderOut}); err != nil {
+		t.Fatalf("text order: %v", err)
+	}
+	ob := inkBands(t, orderOut)
+	if len(ob) != 2 {
+		t.Fatalf("text %q gave %d ink bands, want 2", "i mmmm", len(ob))
+	}
+	if inkWidthOfBand(t, orderOut, ob[0]) >= inkWidthOfBand(t, orderOut, ob[1]) {
+		t.Errorf("text i mmmm: top band is not the narrower word; line order is reversed")
+	}
+
+	t.Chdir(dir) // the next call has no -out, so it lands on the default name in the cwd
+	if err := runText([]string{"-size", "96", "-color", "00ff00", "nope"}); err != nil {
+		t.Fatalf("text -color: %v", err)
+	}
+	if w, h := pngDims(t, "nope.png"); w != 96 || h != 96 {
+		t.Errorf("text -size 96 = %dx%d, want square 96x96", w, h)
+	}
+	if n := len(inkBands(t, "nope.png")); n != 1 {
+		t.Errorf("one word gave %d ink bands, want 1", n)
+	}
+	if n := countPNGColor(t, "nope.png", color.RGBA{0, 0xff, 0, 255}); n < 500 {
+		t.Errorf("text -color: only %d green pixels; -color ignored", n)
+	}
+
+	// The default name comes from the words, and words are not paths: routing
+	// them through the path sanitizer turned "24/7" into "7.png".
+	if err := runText([]string{"24/7", "v1.0"}); err != nil {
+		t.Fatalf("text punctuated words: %v", err)
+	}
+	if _, err := os.Stat("24_7_v1_0.png"); err != nil {
+		t.Errorf("default name for %q: %v; want 24_7_v1_0.png", "24/7 v1.0", err)
+	}
+
+	// Lowercase input is set as block capitals. Compare against the same words
+	// already uppercase: same glyphs, so byte-identical output.
+	if err := runText([]string{"tbh", "-out", out}); err != nil {
+		t.Fatalf("text lower: %v", err)
+	}
+	lower, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := runText([]string{"TBH", "-out", out}); err != nil {
+		t.Fatalf("text upper: %v", err)
+	}
+	upper, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(lower, upper) {
+		t.Error("text tbh and text TBH differ; input is not being upper-cased")
+	}
+
+	// Failure modes that used to write a blank or garbage tile and report success.
+	if err := runText([]string{"hello", "-size", "2", "-out", out}); err == nil {
+		t.Error("text wrote a tile too small to hold any ink; want error")
+	}
+	many := make([]string, 130)
+	for i := range many {
+		many[i] = "x"
+	}
+	if err := runText(append(many, "-out", out)); err == nil {
+		t.Error("text accepted 130 words (every line rounds away); want error")
+	}
+	if err := runText([]string{strings.Repeat("a", maxLineRunes+1), "-out", out}); err == nil {
+		t.Errorf("text accepted a word longer than %d characters; want error", maxLineRunes)
+	}
+	if err := runText([]string{"日本語", "-out", out}); err == nil {
+		t.Error("text accepted a script Anton has no glyphs for; want error")
+	}
+	if err := runText([]string{"\u200b", "-out", out}); err == nil {
+		t.Error("text accepted a word with no printable characters; want error")
+	}
+
+	if err := runText([]string{"-out", out}); err == nil {
+		t.Error("text accepted no words; want error")
+	}
+	if err := runText([]string{"tbh", "-size", "300", "-out", out}); err == nil {
+		t.Error("text accepted size > 256; want error")
+	}
+	if err := runText([]string{"tbh", "-size", "0", "-out", out}); err == nil {
+		t.Error("text accepted size 0; want error")
+	}
+	for _, bad := range []string{"puce", "fff", "ffffffff", "", "0xffffff"} {
+		if err := runText([]string{"tbh", "-color", bad, "-out", out}); err == nil {
+			t.Errorf("text accepted -color %q; want error", bad)
+		}
+	}
+	if err := runText([]string{"tbh", "-color", "#1e1e1e", "-out", out}); err != nil {
+		t.Errorf("text rejected the documented #rrggbb form: %v", err)
+	}
+	if err := runText([]string{"tbh", "-out", out, "extra"}); err == nil {
+		t.Error("text accepted words after the flags; want error")
+	}
+}
+
+// inkWidthOfBand returns how many columns of the given row span carry ink.
+func inkWidthOfBand(t *testing.T, path string, band [2]int) int {
+	t.Helper()
+	f, err := os.Open(path)
+	if err != nil {
+		t.Fatalf("open %s: %v", path, err)
+	}
+	defer f.Close()
+	img, err := png.Decode(f)
+	if err != nil {
+		t.Fatalf("decode %s: %v", path, err)
+	}
+	b, n := img.Bounds(), 0
+	for x := b.Min.X; x < b.Max.X; x++ {
+		for y := band[0]; y <= band[1]; y++ {
+			if _, _, _, a := img.At(x, y).RGBA(); a > 0 {
+				n++
+				break
+			}
+		}
+	}
+	return n
 }
