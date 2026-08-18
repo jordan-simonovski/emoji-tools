@@ -13,8 +13,17 @@ builds:
       - -s -w -X main.version={{ .Version }}
 
 archives:
+  # Setting `files` replaces goreleaser's defaults, so the usual LICENSE/README/
+  # CHANGELOG are listed again here. Anton is embedded in the binary and the OFL
+  # requires its licence to travel with it.
   - formats: [tar.gz]
     name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE*
+      - README*
+      - CHANGELOG*
+      - src: internal/emoji/assets/Anton-OFL.txt
+        dst: Anton-OFL.txt
     format_overrides:
       - goos: windows
         formats: [zip]

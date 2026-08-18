@@ -1,6 +1,6 @@
 # emoji-tools
 
-Turn any logo or image into Slack emojis. One binary, fifteen makers:
+Turn any logo or image into Slack emojis. One binary, sixteen makers:
 
 | Command | What it makes |
 |---|---|
@@ -19,8 +19,11 @@ Turn any logo or image into Slack emojis. One binary, fifteen makers:
 | `bongocat` | Bongo cat drumming on your image, overlaid so the cat sits in front. |
 | `statham` | Traces your image over Jason Statham's head as he dances. |
 | `fistpump` | A shaking fist pumping your image in the air, mirrorable for either side of another emoji. |
+| `text` | Block-capital word emoji in the `:same-tbh:` style — no input image, just words. |
 
 Every output is a **square** image within Slack's limits.
+
+`text` is the exception: it takes words instead of an image.
 
 Inputs can be **SVG** (rendered with a pure-Go rasterizer — no external tools) or raster **PNG / JPEG / GIF / WebP**.
 
@@ -195,6 +198,19 @@ The logo sits just above the fist, so `-scale` past roughly `0.6` runs it off th
 top of the tile (and by different amounts in each frame). Pair a bigger `-scale`
 with a positive `-dy` to bring it back into frame.
 
+### text
+
+```sh
+emoji-tools text tbh fair                            # -> tbh_fair.png
+emoji-tools text not this                            # -> not_this.png
+emoji-tools text same tbh -color 1e1e1e              # any #rrggbb
+emoji-tools text nope -size 64
+```
+
+The `:same-tbh:` look: heavy red block capitals, one word per line, scaled up
+until the widest word or the whole stack hits the edge of the tile. Takes words
+rather than an input image.
+
 ## Slack emoji limits
 
 Slack custom emoji must be **square**, **under 128 KB**, and animated GIFs are capped at
@@ -209,5 +225,8 @@ with ≤14 frames, and the `-tile`/`-size` flags are capped at 256px.
   [doctaphred](https://gist.github.com/doctaphred/f30716e341aaa0673294639093a0632a).
 - `petpet` uses the hand-frame artwork from
   [aDu/pet-pet-gif](https://github.com/aDu/pet-pet-gif).
+- `text` sets its words in [Anton](https://fonts.google.com/specimen/Anton)
+  (SIL OFL 1.1, licence in `internal/emoji/assets/Anton-OFL.txt`) — a free stand-in
+  for the proprietary condensed grotesque the original `:same-tbh:` emoji used.
 - `bongocat` uses the "bongo cat" meme (original cat art by StrayRogue,
   animation by DitzyFlama).

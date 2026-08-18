@@ -31,6 +31,7 @@ Commands:
   bongocat      Bongo cat drumming on your image
   statham       Trace your image over Jason Statham's head as he dances
   fistpump      A shaking fist pumping your image in the air
+  text          Block-capital word emoji, ":same-tbh:" style (takes words, not an image)
   version       Print the emoji-tools version
 
 Run "emoji-tools <command> -h" for command-specific flags.
@@ -75,6 +76,8 @@ func Run(args []string) int {
 		err = runStatham(args[1:])
 	case "fistpump":
 		err = runFistpump(args[1:])
+	case "text":
+		err = runText(args[1:])
 	case "version", "-version", "--version":
 		fmt.Printf("emoji-tools %s\n", Version)
 		return 0

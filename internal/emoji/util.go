@@ -85,13 +85,19 @@ var nonName = regexp.MustCompile(`[^a-z0-9_-]+`)
 // sanitizeName turns a file path into a Slack-safe emoji name.
 func sanitizeName(path string) string {
 	base := filepath.Base(path)
-	base = strings.TrimSuffix(base, filepath.Ext(base))
-	base = nonName.ReplaceAllString(strings.ToLower(base), "_")
-	base = strings.Trim(base, "_")
-	if base == "" {
-		base = "emoji"
+	return sanitizeWords(strings.TrimSuffix(base, filepath.Ext(base)))
+}
+
+// sanitizeWords is sanitizeName for text that isn't a path. Running words
+// through sanitizeName instead drops everything before the last "/" and after
+// the last ".", so "24/7" would come out as "7".
+func sanitizeWords(s string) string {
+	s = nonName.ReplaceAllString(strings.ToLower(s), "_")
+	s = strings.Trim(s, "_")
+	if s == "" {
+		s = "emoji"
 	}
-	return base
+	return s
 }
 
 func writePNG(img image.Image, path string) error {
