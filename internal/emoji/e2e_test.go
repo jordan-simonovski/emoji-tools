@@ -266,6 +266,48 @@ func TestE2E_Confetti(t *testing.T) {
 	}
 }
 
+func TestE2E_Speed(t *testing.T) {
+	defer quiet(t)()
+	dir := t.TempDir()
+	pngIn, _ := writeFixtures(t, dir)
+	if err := runSpeed([]string{pngIn, "-name", "spd", "-tile", "64", "-frames", "6", "-out", dir}); err != nil {
+		t.Fatalf("speed: %v", err)
+	}
+	path := filepath.Join(dir, "spd.gif")
+	if n := gifFrameCount(t, path); n != 6 {
+		t.Errorf("speed frames = %d, want 6", n)
+	}
+	if lo, hi := opaqueRange(t, path); hi <= lo {
+		t.Errorf("speed frames don't vary (opaque range %d..%d); lines not drawn", lo, hi)
+	}
+	// The light edge is what makes the lines show on Slack's dark theme.
+	if n := countColorNear(t, path, color.RGBA{190, 190, 190, 255}, 30); n < 20 {
+		t.Errorf("speed: only %d light-edge pixels, want >= 20", n)
+	}
+	if err := runSpeed([]string{pngIn, "-lines", "-1", "-out", dir}); err == nil {
+		t.Error("speed accepted negative -lines; want error")
+	}
+}
+
+func TestE2E_Sparkle(t *testing.T) {
+	defer quiet(t)()
+	dir := t.TempDir()
+	pngIn, _ := writeFixtures(t, dir)
+	if err := runSparkle([]string{pngIn, "-name", "spk", "-tile", "64", "-frames", "6", "-out", dir}); err != nil {
+		t.Fatalf("sparkle: %v", err)
+	}
+	path := filepath.Join(dir, "spk.gif")
+	if n := gifFrameCount(t, path); n != 6 {
+		t.Errorf("sparkle frames = %d, want 6", n)
+	}
+	if n := countColorNear(t, path, color.RGBA{0xff, 0xd8, 0x4d, 255}, 30); n < 10 {
+		t.Errorf("sparkle: only %d gold pixels, want >= 10", n)
+	}
+	if err := runSparkle([]string{pngIn, "-color", "nope", "-out", dir}); err == nil {
+		t.Error("sparkle accepted bad -color; want error")
+	}
+}
+
 func TestE2E_Bongocat(t *testing.T) {
 	defer quiet(t)()
 	dir := t.TempDir()

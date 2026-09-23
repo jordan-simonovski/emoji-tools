@@ -3,6 +3,7 @@ package emoji
 import (
 	"fmt"
 	"image"
+	"image/color"
 	"image/draw"
 	_ "image/gif"
 	_ "image/jpeg"
@@ -16,6 +17,7 @@ import (
 	"github.com/srwiley/rasterx"
 	xdraw "golang.org/x/image/draw"
 	"golang.org/x/image/math/f64"
+	"golang.org/x/image/vector"
 	_ "golang.org/x/image/webp"
 )
 
@@ -147,4 +149,16 @@ func renderIcon(icon *oksvg.SvgIcon, w, h int) *image.RGBA {
 	scanner := rasterx.NewScannerGV(w, h, rgba, rgba.Bounds())
 	icon.Draw(rasterx.NewDasher(w, h, scanner), 1.0)
 	return rgba
+}
+
+// fillPoly paints an anti-aliased filled polygon (points as x,y pairs) onto dst.
+func fillPoly(dst *image.RGBA, c color.Color, pts ...float32) {
+	b := dst.Bounds()
+	r := vector.NewRasterizer(b.Dx(), b.Dy())
+	r.MoveTo(pts[0], pts[1])
+	for i := 2; i+1 < len(pts); i += 2 {
+		r.LineTo(pts[i], pts[i+1])
+	}
+	r.ClosePath()
+	r.Draw(dst, b, image.NewUniform(c), image.Point{})
 }
