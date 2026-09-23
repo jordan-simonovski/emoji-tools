@@ -29,6 +29,7 @@ Commands:
   content-aware Content-aware squeeze that swells the subject and deep-fries it
   speed         Anime speed lines streaking past your image
   sparkle       Twinkling sparkles over your image
+  shiny         A metallic glint sweeping across your image
   confetti      Rain confetti over your image (animated overlay)
   bongocat      Bongo cat drumming on your image
   statham       Trace your image over Jason Statham's head as he dances
@@ -74,6 +75,8 @@ func Run(args []string) int {
 		err = runSpeed(args[1:])
 	case "sparkle":
 		err = runSparkle(args[1:])
+	case "shiny":
+		err = runShiny(args[1:])
 	case "confetti":
 		err = runConfetti(args[1:])
 	case "bongocat":
