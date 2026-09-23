@@ -424,6 +424,60 @@ func TestE2E_Statham(t *testing.T) {
 	}
 }
 
+func TestE2E_Naruto(t *testing.T) {
+	defer quiet(t)()
+	dir := t.TempDir()
+	// Cyan is absent from the orange/black sprite, so cyan in the output means the
+	// head image composited.
+	cyanIn := filepath.Join(dir, "cyan.png")
+	writeSolidPNG(t, cyanIn, color.RGBA{0, 255, 255, 255})
+	if err := runNaruto([]string{cyanIn, "-name", "nr", "-tile", "64", "-out", dir}); err != nil {
+		t.Fatalf("naruto: %v", err)
+	}
+	if n := gifFrameCount(t, filepath.Join(dir, "nr.gif")); n != len(narutoHeads) {
+		t.Errorf("naruto frames = %d, want %d", n, len(narutoHeads))
+	}
+	if n := countColorNear(t, filepath.Join(dir, "nr.gif"), color.RGBA{0, 255, 255, 255}, 40); n < 100 {
+		t.Errorf("naruto: only %d cyan pixels in output; head image not compositing", n)
+	}
+	// The light edge only comes from speed lines, so -lines 0 should remove it.
+	if err := runNaruto([]string{cyanIn, "-lines", "0", "-name", "nr0", "-tile", "64", "-out", dir}); err != nil {
+		t.Fatalf("naruto -lines 0: %v", err)
+	}
+	edge := color.RGBA{210, 210, 210, 255}
+	if with, without := countColorNear(t, filepath.Join(dir, "nr.gif"), edge, 30), countColorNear(t, filepath.Join(dir, "nr0.gif"), edge, 30); with < 20 || without >= with/4 {
+		t.Errorf("naruto light-edge pixels: %d with lines, %d with -lines 0; speed lines not drawn", with, without)
+	}
+	b, err := os.ReadFile(filepath.Join(dir, "nr.gif"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := gif.DecodeAll(bytes.NewReader(b))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if g.Delay[0] != 5 {
+		t.Errorf("naruto delay = %dcs, want 5 (sped up from the source's 10)", g.Delay[0])
+	}
+	if err := runNaruto([]string{"-preview", "-name", "nrp", "-tile", "64", "-out", dir}); err != nil {
+		t.Fatalf("naruto -preview: %v", err)
+	}
+	if n := countColorNear(t, filepath.Join(dir, "nrp.gif"), color.RGBA{255, 0, 255, 255}, 40); n < 50 {
+		t.Errorf("naruto -preview: only %d magenta pixels; head box not drawn", n)
+	}
+	if err := runNaruto([]string{"-out", dir}); err == nil {
+		t.Error("naruto accepted no input without -preview; want error")
+	}
+	if err := runNaruto([]string{cyanIn, "-lines", "-1", "-out", dir}); err == nil {
+		t.Error("naruto accepted negative -lines; want error")
+	}
+	for _, bad := range [][]string{{"-tile", "9999"}, {"-scale", "0"}, {"-dur", "10"}} {
+		if err := runNaruto(append([]string{cyanIn, "-out", dir}, bad...)); err == nil {
+			t.Errorf("naruto accepted %v; want error", bad)
+		}
+	}
+}
+
 func TestE2E_Fistpump(t *testing.T) {
 	defer quiet(t)()
 	dir := t.TempDir()

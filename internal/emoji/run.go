@@ -34,6 +34,7 @@ Commands:
   bongocat      Bongo cat drumming on your image
   statham       Trace your image over Jason Statham's head as he dances
   fistpump      A shaking fist pumping your image in the air
+  naruto        Your image on Naruto's head as he sprints, with speed lines
   text          Block-capital word emoji, ":same-tbh:" style (takes words, not an image)
   version       Print the emoji-tools version
 
@@ -85,6 +86,8 @@ func Run(args []string) int {
 		err = runStatham(args[1:])
 	case "fistpump":
 		err = runFistpump(args[1:])
+	case "naruto":
+		err = runNaruto(args[1:])
 	case "text":
 		err = runText(args[1:])
 	case "version", "-version", "--version":
