@@ -1,6 +1,6 @@
 # emoji-tools
 
-Turn any logo or image into Slack emojis. One binary, nineteen makers:
+Turn any logo or image into Slack emojis. One binary, twenty makers:
 
 | Command | What it makes |
 |---|---|
@@ -22,6 +22,7 @@ Turn any logo or image into Slack emojis. One binary, nineteen makers:
 | `bongocat` | Bongo cat drumming on your image, overlaid so the cat sits in front. |
 | `statham` | Traces your image over Jason Statham's head as he dances. |
 | `fistpump` | A shaking fist pumping your image in the air, mirrorable for either side of another emoji. |
+| `naruto` | Your image on Naruto's head as he sprints, with anime speed lines behind him. |
 | `text` | Block-capital word emoji in the `:same-tbh:` style — no input image, just words. |
 
 Every output is a **square** image within Slack's limits.
@@ -228,6 +229,18 @@ readable. Generate both and paste `:fistpump_x_left::something::fistpump_x_right
 The logo sits just above the fist, so `-scale` past roughly `0.6` runs it off the
 top of the tile (and by different amounts in each frame). Pair a bigger `-scale`
 with a positive `-dy` to bring it back into frame.
+
+### naruto
+
+```sh
+emoji-tools naruto clickhouse-logo.svg               # -> naruto_clickhouse-logo.gif
+emoji-tools naruto logo.png -dur 30 -lines 20        # faster, busier
+emoji-tools naruto -preview                          # outline where the image lands
+```
+
+Your image rides on Naruto's head as he sprints, with speed lines trailing
+behind him. It runs twice as fast as the source GIF by default; `-dur` sets the
+frame time, and `-lines 0` drops the speed lines.
 
 ### text
 
