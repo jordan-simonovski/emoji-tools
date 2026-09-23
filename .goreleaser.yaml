@@ -49,9 +49,10 @@ homebrew_casks:
     license: "Apache-2.0"
     # The binary is unsigned; strip the quarantine flag on install so macOS
     # Gatekeeper doesn't block it ("Apple could not verify ...").
-    hooks:
-      post:
-        install: |
-          if system_command("/usr/bin/xattr", args: ["-h"]).exit_status == 0
-            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/emoji-tools"]
-          end
+    # custom_block, not hooks: goreleaser's hooks emit `postflight`, which Homebrew deprecated.
+    custom_block: |
+      postflight_steps do
+        on_macos do
+          run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ "{{" }}staged_path{{ "}}" }}/emoji-tools"], must_succeed: false
+        end
+      end
