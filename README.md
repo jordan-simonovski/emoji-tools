@@ -1,6 +1,6 @@
 # emoji-tools
 
-Turn any logo or image into Slack emojis. One binary, sixteen makers:
+Turn any logo or image into Slack emojis. One binary, eighteen makers:
 
 | Command | What it makes |
 |---|---|
@@ -15,6 +15,8 @@ Turn any logo or image into Slack emojis. One binary, sixteen makers:
 | `party-blob` | The rainbow colour-cycle plus a bouncing squash-and-stretch wobble. |
 | `spin` | A spinning-coin 3D flip around the vertical axis. |
 | `content-aware` | The content-aware-scale meme: the subject swells and warps as the image squeezes in, deep-frying as it goes. |
+| `speed` | Anime speed lines streaking past your image. |
+| `sparkle` | Twinkling four-point sparkles over your image. |
 | `confetti` | Rains confetti over your image (animated overlay). |
 | `bongocat` | Bongo cat drumming on your image, overlaid so the cat sits in front. |
 | `statham` | Traces your image over Jason Statham's head as he dances. |
@@ -148,6 +150,24 @@ it goes, then bounces back out so the loop is seamless.
 `-warp` sets how far the carve goes, `-stretch` how much taller than wide the
 subject ends up, `-zoom` the extra crop-in on top, and `-fry` the
 saturation/contrast/grain crunch. All of them peak mid-loop and unwind.
+
+### speed
+
+```sh
+emoji-tools speed clickhouse-logo.svg               # -> clickhouse-logo_speed.gif
+emoji-tools speed logo.png -lines 18 -dur 30        # denser, faster flicker
+```
+
+Flickering speed lines, dark with a light edge so they show in light and dark mode, fan in from the right over a still image.
+
+### sparkle
+
+```sh
+emoji-tools sparkle clickhouse-logo.svg             # -> clickhouse-logo_sparkle.gif
+emoji-tools sparkle logo.png -count 10 -color '#ffffff'
+```
+
+Sparkles pop in and out on staggered cycles, so the loop never pulses all at once.
 
 ### confetti
 
