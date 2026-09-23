@@ -1,6 +1,6 @@
 # emoji-tools
 
-Turn any logo or image into Slack emojis. One binary, eighteen makers:
+Turn any logo or image into Slack emojis. One binary, nineteen makers:
 
 | Command | What it makes |
 |---|---|
@@ -17,6 +17,7 @@ Turn any logo or image into Slack emojis. One binary, eighteen makers:
 | `content-aware` | The content-aware-scale meme: the subject swells and warps as the image squeezes in, deep-frying as it goes. |
 | `speed` | Anime speed lines streaking past your image. |
 | `sparkle` | Twinkling four-point sparkles over your image. |
+| `shiny` | A metallic glint sweeping across your image, like light catching a coin. |
 | `confetti` | Rains confetti over your image (animated overlay). |
 | `bongocat` | Bongo cat drumming on your image, overlaid so the cat sits in front. |
 | `statham` | Traces your image over Jason Statham's head as he dances. |
@@ -156,9 +157,10 @@ saturation/contrast/grain crunch. All of them peak mid-loop and unwind.
 ```sh
 emoji-tools speed clickhouse-logo.svg               # -> clickhouse-logo_speed.gif
 emoji-tools speed logo.png -lines 18 -dur 30        # denser, faster flicker
+emoji-tools speed logo.png -direction front         # charging at the viewer
 ```
 
-Flickering speed lines, dark with a light edge so they show in light and dark mode, fan in from the right over a still image.
+Flickering speed lines, dark with a light edge so they show in light and dark mode, over a still image. `-direction` sets which way it's running: `right` (default) and `left` fan the lines in from behind, `front` bursts them out from the centre.
 
 ### sparkle
 
@@ -168,6 +170,15 @@ emoji-tools sparkle logo.png -count 10 -color '#ffffff'
 ```
 
 Sparkles pop in and out on staggered cycles, so the loop never pulses all at once.
+
+### shiny
+
+```sh
+emoji-tools shiny clickhouse-logo.svg               # -> clickhouse-logo_shiny.gif
+emoji-tools shiny logo.png -dur 40                  # faster glint
+```
+
+A bright band with a thinner one trailing it crosses the image, then pauses so each pass reads as a fresh catch of the light. Transparent areas stay transparent.
 
 ### confetti
 

@@ -287,6 +287,60 @@ func TestE2E_Speed(t *testing.T) {
 	if err := runSpeed([]string{pngIn, "-lines", "-1", "-out", dir}); err == nil {
 		t.Error("speed accepted negative -lines; want error")
 	}
+	gifs := map[string][]byte{}
+	for _, d := range []string{"right", "left", "front"} {
+		if err := runSpeed([]string{pngIn, "-direction", d, "-name", d, "-tile", "64", "-frames", "2", "-out", dir}); err != nil {
+			t.Fatalf("speed -direction %s: %v", d, err)
+		}
+		b, err := os.ReadFile(filepath.Join(dir, d+".gif"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		gifs[d] = b
+	}
+	if bytes.Equal(gifs["right"], gifs["left"]) || bytes.Equal(gifs["right"], gifs["front"]) {
+		t.Error("speed -direction left/front match right; direction ignored")
+	}
+	if err := runSpeed([]string{pngIn, "-direction", "up", "-out", dir}); err == nil {
+		t.Error("speed accepted -direction up; want error")
+	}
+}
+
+func TestE2E_Shiny(t *testing.T) {
+	defer quiet(t)()
+	dir := t.TempDir()
+	pngIn, _ := writeFixtures(t, dir)
+	if err := runShiny([]string{pngIn, "-name", "shn", "-tile", "64", "-frames", "8", "-out", dir}); err != nil {
+		t.Fatalf("shiny: %v", err)
+	}
+	path := filepath.Join(dir, "shn.gif")
+	if n := gifFrameCount(t, path); n != 8 {
+		t.Errorf("shiny frames = %d, want 8", n)
+	}
+	// The fixture has no near-white pixels, so any here come from the glint.
+	if n := countColorNear(t, path, color.RGBA{255, 255, 255, 255}, 30); n < 20 {
+		t.Errorf("shiny: only %d near-white pixels, want >= 20", n)
+	}
+	if lo, hi := opaqueRange(t, path); lo != hi {
+		t.Errorf("shiny changed transparency (opaque range %d..%d); glint leaked outside the image", lo, hi)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	frames, _, err := gifFrames(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Equal(frames[0].Pix, frames[2].Pix) {
+		t.Error("shiny frames 0 and 2 are identical; glint isn't moving")
+	}
+	if err := runShiny([]string{pngIn, "-frames", "0", "-out", dir}); err == nil {
+		t.Error("shiny accepted -frames 0; want error")
+	}
+	if err := runShiny([]string{pngIn, "-tile", "0", "-out", dir}); err == nil {
+		t.Error("shiny accepted -tile 0; want error")
+	}
 }
 
 func TestE2E_Sparkle(t *testing.T) {
